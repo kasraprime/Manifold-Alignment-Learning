@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import argparse
+import csv 
 from numpy.linalg import norm
 from scipy.spatial.distance import cosine, euclidean
 from scipy.stats import pearsonr
@@ -143,14 +144,13 @@ def test(experiment_name, task, gpu_num=0, pretrained='', margin=0.4, losstype='
 
     ground_truth, predicted, distance = object_identification_task_classifier(a,b,ys,a_train,b_train,lamb_std=1,cosine=cosined)
 
-    #### Word generation ####
+    #### Retrieval task by giving an image and finding the closest word descriptions ####
     ground_truth_word, predicted_word, distance_word = object_identification_task_classifier(b,a,ys,b_train,a_train,lamb_std=1,cosine=cosined)
-    
-    for i in range(50):        
-        print('ground truth:',ground_truth_word[0][i]) 
-        print('predicted:',predicted_word[0][i])
-        print('instance name of words:',instance_data[i]) #label of language
-        print('instance name of image:',instance_data[0]) #label of image
+    with open('retrieval_non_pro.csv', mode='w') as retrieval_non_pro:
+        csv_file_writer = csv.writer(retrieval_non_pro, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        csv_file_writer.writerow(['image', 'language', 'predicted', 'ground truth' ])
+        for i in range(50):        
+            csv_file_writer.writerow([instance_data[0], instance_data[i], predicted_word[0][i], ground_truth_word[0][i]])        
         
     precisions = []
     recalls = []
