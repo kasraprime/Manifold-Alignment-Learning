@@ -88,6 +88,8 @@ def test(experiment_name, task, gpu_num=0, pretrained='', margin=0.4, losstype='
 
     # Iterate through the train data.
     if a_train is None or b_train is None:
+        a_train = []
+        b_train = []
         for data in train_loader:  
             anchor_data = data[0].to(device)
             positive_data = data[1].to(device)
@@ -116,6 +118,8 @@ def test(experiment_name, task, gpu_num=0, pretrained='', margin=0.4, losstype='
     b = load_embeddings(test_results_dir+'img_embeds.npy')    
     if a is None or b is None:        
         compute_test_embeddings= True
+        a = []
+        b = []
     
     # Iterate through the test data.
     for data in test_loader:          
