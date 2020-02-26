@@ -90,13 +90,14 @@ def test(experiment_name, task, gpu_num=0, pretrained='', margin=0.4, losstype='
     if a_train is None or b_train is None:
         a_train = []
         b_train = []
+        print("Computing embeddings for train data to calculate threshhold for distance")
         for data in train_loader:  
             anchor_data = data[0].to(device)
             positive_data = data[1].to(device)
             label = data[2]      
             a_train.append(model_A(anchor_data.to(device)).cpu().detach().numpy())         
             b_train.append(model_B(positive_data.to(device)).cpu().detach().numpy()) 
-    
+        print("Finished Computing embeddings for train data")
     #saving embeddings if not already saved
     save_embeddings(test_results_dir+'lang_embeds_train.npy', a_train)        
     save_embeddings(test_results_dir+'img_embeds_train.npy', b_train)
@@ -122,6 +123,7 @@ def test(experiment_name, task, gpu_num=0, pretrained='', margin=0.4, losstype='
         b = []
     
     # Iterate through the test data.
+    print("computing embeddings for test data")
     for data in test_loader:          
         language_data, vision_data, object_name, instance_name = data
         language_data = language_data.to(device) 
@@ -131,7 +133,7 @@ def test(experiment_name, task, gpu_num=0, pretrained='', margin=0.4, losstype='
             a.append(model_A(language_data).cpu().detach().numpy()) # Language.        
             b.append(model_B(vision_data).cpu().detach().numpy()) # Vision.        
         ys.extend(object_name)
-        
+    print("finished computing embeddings for test data")
     # Convert string labels to ints.
     labelencoder = LabelEncoder()
     labelencoder.fit(ys)
