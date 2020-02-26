@@ -164,14 +164,7 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
 
     # Plot and save batch loss history.
     pickle.dump( ([loss_hist[::10]]), open( train_results_dir+'epoch_corr.pkl', "wb" ) )
-    Visualize(train_results_dir+'epoch_corr.pkl','Correlation History',False,'epoch','Correlation (log scale)',None,'log',None,(14,7),train_results_dir+'Figures/')
-    #plt.figure(figsize=(14,7))
-    #plt.plot(loss_hist[::10])
-    #plt.xlabel('Batch')
-    #plt.ylabel('Loss (log scale)')
-    #plt.yscale('log')
-    #plt.title('Loss History')
-    #plt.savefig(train_results_dir+'correlation_history.png')
+    Visualize(train_results_dir+'epoch_corr.pkl','Correlation Batch',False, 'Batch','Correlation (log scale)',None,'log',None,(14,7),train_results_dir+'Figures/')    
 
     #### Learn the transformations for CCA ####
     if losstype=="CCA":        
