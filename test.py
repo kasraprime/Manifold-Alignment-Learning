@@ -89,7 +89,9 @@ def test(experiment_name, task, gpu_num=0, pretrained='', margin=0.4, losstype='
     # Iterate through the train data.
     if a_train is None or b_train is None:
         for data in train_loader:  
-            anchor_data, positive_data, label = data      
+            anchor_data = data[0].to(device)
+            positive_data = data[1].to(device)
+            label = data[2]      
             a_train.append(model_A(anchor_data.to(device)).cpu().detach().numpy())         
             b_train.append(model_B(positive_data.to(device)).cpu().detach().numpy()) 
     
