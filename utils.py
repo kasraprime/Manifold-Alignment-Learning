@@ -25,7 +25,7 @@ def load_embeddings(embedding_path):
         embedding = np.load(embedding_path)            
     return embedding
 
-def save_embeddings(embedding,embedding_path):
+def save_embeddings(embedding_path,embedding):
     if not os.path.exists(embedding_path):
         np.save(embedding_path, embedding)
 
