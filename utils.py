@@ -52,7 +52,7 @@ def Visualize(pkldata,title,xlablel,ylabel,xscale,yscale,legend,figsize,location
     if legend is not None:
         plt.legend(loc='lower right')
     plt.savefig(location+title+'.pdf')
-    
+    plt.close('all')
 
 def procrustes_distance(A, B):
         
