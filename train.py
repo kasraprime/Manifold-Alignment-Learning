@@ -133,8 +133,8 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
             optimizer_A.step()
             optimizer_B.step()
 
-            # Save batch loss.
-            loss_hist.append(loss.item())
+            # Save batch loss. Since we are minimizing -corr the loss is negative.
+            loss_hist.append(-1*loss.item())
             
             epoch_loss += embedding_a.shape[0] * loss.item()
 
@@ -152,24 +152,26 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
         #since the batch size is 1 therefore: len(trainloader)==counter
         print('*********** epoch is finished ***********')
         epoch_loss=-1*epoch_loss
-        print('epoch: ', epoch, 'loss: ', (epoch_loss) / counter)
+        print('epoch: ', epoch, 'loss(correlation): ', (epoch_loss) / counter)
         epoch_list.append(epoch+1)
         loss_list.append(epoch_loss / counter)
         pickle.dump( ([epoch_list, loss_list]), open( train_results_dir+'epoch_loss.pkl', "wb" ) )
-        Visualize(train_results_dir+'epoch_loss.pkl','Loss History','epoch','Loss (log scale)',None,'log',None,(14,7),train_results_dir+'Figures/')
+        Visualize(train_results_dir+'epoch_loss.pkl','Correlation History',True,'epoch','Correlation (log scale)',None,'log',None,(14,7),train_results_dir+'Figures/')
         # Update learning rate schedulers.
         scheduler_A.step()
         scheduler_B.step()
         
 
     # Plot and save batch loss history.
-    plt.figure(figsize=(14,7))
-    plt.plot(loss_hist[::10])
-    plt.xlabel('Batch')
-    plt.ylabel('Loss (log scale)')
-    plt.yscale('log')
-    plt.title('Loss History')
-    plt.savefig(train_results_dir+'correlation_history.png')
+    pickle.dump( ([loss_hist[::10]]), open( train_results_dir+'epoch_corr.pkl', "wb" ) )
+    Visualize(train_results_dir+'epoch_corr.pkl','Correlation History',False,'epoch','Correlation (log scale)',None,'log',None,(14,7),train_results_dir+'Figures/')
+    #plt.figure(figsize=(14,7))
+    #plt.plot(loss_hist[::10])
+    #plt.xlabel('Batch')
+    #plt.ylabel('Loss (log scale)')
+    #plt.yscale('log')
+    #plt.title('Loss History')
+    #plt.savefig(train_results_dir+'correlation_history.png')
 
     #### Learn the transformations for CCA ####
     if losstype=="CCA":        

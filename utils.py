@@ -29,7 +29,7 @@ def save_embeddings(embedding,embedding_path):
     if not os.path.exists(embedding_path):
         np.save(embedding_path, embedding)
 
-def Visualize(pkldata,title,xlablel,ylabel,xscale,yscale,legend,figsize,location):
+def Visualize(pkldata,title,has_x_axis,xlablel,ylabel,xscale,yscale,legend,figsize,location):
     if not os.path.exists(location):        
         os.makedirs(location)
     visual=pickle.load(open(pkldata, 'rb'))
@@ -37,11 +37,20 @@ def Visualize(pkldata,title,xlablel,ylabel,xscale,yscale,legend,figsize,location
     if figsize is not None:
         plt.figure(figsize=figsize)
     if legend is not None:
-        for i in range(len(visual)-1):         
-            plt.plot(visual[0],visual[i+1],label=legend[i]) 
+        if has_x_axis:
+            for i in range(len(visual)-1):         
+                plt.plot(visual[0],visual[i+1],label=legend[i]) 
+        else:
+            for i in range(len(visual)):         
+                plt.plot(visual[i],label=legend[i]) 
+
     else:
-        for i in range(len(visual)-1):         
-            plt.plot(visual[0],visual[i+1]) 
+        if has_x_axis:            
+            for i in range(len(visual)-1):         
+                plt.plot(visual[0],visual[i+1]) 
+        else:            
+            for i in range(len(visual)):         
+                plt.plot(visual[i]) 
     plt.title(title)
     plt.xlabel(xlablel)
     plt.ylabel(ylabel)
