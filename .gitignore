@@ -1,0 +1,6 @@
+__pycache__/
+venv/
+results/
+
+nohup.out
+*.pkl
