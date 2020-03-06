@@ -5,6 +5,12 @@ def cosine_pairwise_loss(d_a,d_b,match,model_A,model_B):
     l=criterion(model_A(d_a),model_B(d_b),torch.tensor(match))
     return l
 
+def triplet_loss_vanilla(anchor, positive, negative, marker, model_A, model_B, margin=0.4, p=2.0):
+    triplet_loss = torch.nn.TripletMarginLoss(margin=0.4, p=0.2)
+    l = triplet_loss(model_A(anchor), model_A(positive), model_A(negative))
+    
+    return l
+
 def deepcca(embedding_a, embedding_b, device, use_all_singular_values, outdim_size):
     # The code is based on https://github.com/VahidooX/DeepCCA/blob/master/objectives.py    
     H1=embedding_a
