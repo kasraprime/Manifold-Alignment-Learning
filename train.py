@@ -10,16 +10,22 @@ import random
 import subprocess
 
 from models import MNISTEmbeddingNet, CIFAREmbeddingNet, RowNet
-from datasets import uw_loaders, cifar10_loaders, mnist_loaders, gld_loaders
+from datasets import uw_loaders, cifar10_loaders, mnist_loaders, gl_loaders
 from utils import setup_dirs, setup_device, save_embeddings, load_embeddings, Visualize
 from losses import cosine_pairwise_loss, deepcca
 
 def parse_args(): 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--wandb_track', default=0, type=int)
-    parser.add_argument('--experiment_name', default='RandomExperiment', type=str)
-    parser.add_argument('--epochs', default=20, type=int)
-    parser.add_argument('--task', default='uw', type=str)
+    parser.add_argument('--wandb_track', default=0, type=int,
+        help='bool for experiment tracking, set to 0 on taki')
+    parser.add_argument('--experiment_name', default='RandomExperiment',
+        help='Name for output folders')
+    parser.add_argument('--epochs', default=20, type=int,
+        help='Number of epochs to run for')
+    parser.add_argument('--task', default='uw',
+        help='task name <cifar10, mnist, uw, gld>')
+    #parser.add_argument('--embedded_dim', default=1024, type=int,
+    #    help='Dimension of embedded manifold')
 
     return parser.parse_known_args()
 
@@ -43,7 +49,7 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
     results_dir = setup_dirs(experiment_name)
     train_results_dir = os.path.join(results_dir, 'train_results/')
     if not os.path.exists(train_results_dir):
-        os.makedirs(os.path.join(train_results_dir)
+        os.makedirs(os.path.join(train_results_dir))
     device = setup_device(gpu_num)    
 
     #### Hyperparameters #####    
@@ -56,9 +62,8 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
 
     with open(os.path.join(results_dir, 'hyperparams_train.txt'), 'w') as f:
         f.write('Command used to run: python \n')
-        f.write(f'ARGS: {ARGS}\n')
+        f.write(f'ARGS: {sys.argv}\n')
         f.write(f'device in use: {device}\n')
-        f.write(f'--experiment_name {experiment_name}')
         f.write(f'--epochs {epochs}\n')
     
     # Setup data loaders and models.
@@ -79,7 +84,7 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
             # Vision 
             model_B = RowNet(4096, embed_dim=1024)
     elif task == 'gld':
-        train_loader, test_loader = gld_loaders('/home/iral/data_processing/gld_data_complete.pkl')
+        train_loader, test_loader = gl_loaders('/home/iral/data_processing/gld_data_complete.pkl')
         model_A = RowNet(3072, embed_dim=1024)
         model_B = RowNet(4096, embed_dim=1024)
          
@@ -166,24 +171,25 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
         epoch_list.append(epoch + 1)
         loss_list.append(epoch_loss / counter)
 
-        Visualize(
-            os.path.join(train_results_dir, 'epoch_loss.pkl'),
-            'Correlation History',
-            True,
-            'epoch',
-            'Correlation (log scale)',
-            None,
-            'log',
-            None,
-            (14, 7),
-            os.path.join(train_results_dir, 'Figures/')
-        )
         # Update learning rate schedulers.
         scheduler_A.step()
         scheduler_B.step()
 
     with open(os.path.join(train_results_dir, 'epoch_loss.pkl'), 'wb') as fout:
         pickle.dump(([epoch_list, loss_list]), fout)
+
+    Visualize(
+        os.path.join(train_results_dir, 'epoch_loss.pkl'),
+        'Correlation History',
+        True,
+        'epoch',
+        'Correlation (log scale)',
+        None,
+        'log',
+        None,
+        (14, 7),
+        os.path.join(train_results_dir, 'Figures/')
+    )
 
     # Plot and save batch loss history.
     with open(os.path.join(train_results_dir, 'epoch_corr.pkl'), 'wb') as fout:
@@ -266,7 +272,7 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
 def main():
     ARGS, unused = parse_args()
 
-    train(ARGS.wandb_track, ARGS.experiment_name, ARGS.epochs, args.ARGS)
+    train(ARGS.wandb_track, ARGS.experiment_name, ARGS.epochs, ARGS.task)
 
 if __name__ == '__main__':
     main() 

@@ -131,7 +131,6 @@ def mnist_loaders():
     
     return train_loader, test_loader
 
-
 class UWData(Dataset):
     """Train/Test split for the preprocessed UW dataset."""    
     def __init__(self, dataloc='./data/rgbd_processed_data/preproc_rgbl_data_wdepth.pkl', train=True):        
@@ -175,6 +174,43 @@ class UWData(Dataset):
         else:
             return self.language_data_test[index], self.vision_data_test[index], self.object_names_test[index], self.instance_names_test[index]        
 
+class GLDData(Dataset):
+    def __init__(self, dataloc, train=True):
+        self.train = train
+        with open(dataloc, 'rb') as f:
+            data = pickle.load(f)
+        language_data = data['language_data']
+        vision_data = data['vision_data']
+        object_names = data['object_names']
+        instance_names = data['instance_names']
+
+        classes_to_keep = [a for a,_ in Counter(data['object_names']).most_common(None)]
+        indices_to_keep = [idx for idx in range(len(data['object_names'])) if data['object_names'][idx] in classes_to_keep]
+
+        indices_to_keep_train, indices_to_keep_test = train_test_split(indices_to_keep, test_size=0.3, random_state=42, stratify=object_names)
+
+        self.language_data_train = [language_data[i] for i in indices_to_keep_train]
+        self.vision_data_train = [vision_data[i] for i in indices_to_keep_train]
+        self.object_names_train = [object_names[i] for i in indices_to_keep_train]
+        self.instance_names_train = [instance_names[i] for i in indices_to_keep_train]
+
+        self.language_data_test = [language_data[i] for i in indices_to_keep_test]
+        self.vision_data_test = [vision_data[i] for i in indices_to_keep_test]
+        self.object_names_test = [object_names[i] for i in indices_to_keep_test]
+        self.instance_names_test = [instance_names[i] for i in indices_to_keep_test]
+
+    def __len__(self):
+        if self.train:
+            return len(self.object_names_train)
+        else:
+            return len(self.object_names_test)
+
+    def __getitem__(self, index):
+        if self.train:
+            return self.language_data_train[index], self.vision_data_train[index], self.object_names_train[index], self.instance_names_train[index]
+        else:
+            return self.language_data_test[index], self.vision_data_test[index], self.object_names_test[index], self.instance_names_test[index]
+
 
 def uw_loaders(uw_data):
     """Setup UW data loaders."""
@@ -194,11 +230,66 @@ def uw_loaders(uw_data):
     
     return train_loader, test_loader
     
-    
-    
-    
-    
-        
-    
-    
-    
+def gl_loaders(gld_data_location, num_workers=8, pin_memory=True, batch_size=1, batch_sampler=None, shuffle=False):
+    with open(gld_data_location, 'rb') as fin:
+        data = pickle.load(fin)
+
+    train, test = gl_train_test_split(data, train_percentage=0.8)
+
+    train_data = GLData(train)
+    test_data = GLData(test)
+
+    kwargs = {
+        'num_workers': num_workers,
+        'pin_memory': pin_memory,
+        'batch_size': batch_size,
+        'batch_sampler': batch_sampler,
+        'shuffle': shuffle
+    }
+
+    return DataLoader(train_data, **kwargs), DataLoader(test_data, **kwargs)
+ 
+def gl_train_test_split(data, train_percentage=0.8):
+    """
+    Splits a grounded language dictionary into training and testing sets.
+
+    data needs the following keys:
+    language_data
+    vision_data
+    object_names
+    instance_names
+    """
+    train = {}
+    test = {}
+
+    # ensure test and train have some of every object
+    train_indices = []
+    unique_object_names = list(set(data['object_names']))
+    for object_name in unique_object_names:
+        train_indices += random.sample(
+            [i for i, name in enumerate(data['object_names']) if name == object_name],
+            int(train_percentage * data['object_names'].count(object_name))
+        )
+    test_indices = [i for i in range(len(data['object_names'])) if i not in train_indices]
+
+    train['language_data'] = [data['language_data'][i] for i in train_indices]
+    train['vision_data'] = [data['vision_data'][i] for i in train_indices]
+    train['object_names'] = [data['object_names'][i] for i in train_indices]
+    train['instance_names'] = [data['instance_names'][i] for i in train_indices]
+
+    test['language_data'] = [data['language_data'][i] for i in test_indices]
+    test['vision_data'] = [data['vision_data'][i] for i in test_indices]
+    test['object_names'] = [data['object_names'][i] for i in test_indices]
+    test['instance_names'] = [data['instance_names'][i] for i in test_indices]
+
+    return train, test
+
+class GLData(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data['object_names'])
+
+    def __getitem__(self, i):
+        return self.data['language_data'][i], self.data['vision_data'][i], self.data['object_names'][i], self.data['instance_names'][i]
