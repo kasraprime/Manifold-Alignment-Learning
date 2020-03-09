@@ -4,3 +4,4 @@ results/
 
 nohup.out
 *.pkl
+*.swp
