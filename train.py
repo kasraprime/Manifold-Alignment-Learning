@@ -10,10 +10,27 @@ import random
 import subprocess
 
 from models import MNISTEmbeddingNet, CIFAREmbeddingNet, RowNet
-from datasets import uw_loaders, cifar10_loaders, mnist_loaders
+from datasets import uw_loaders, cifar10_loaders, mnist_loaders, gld_loaders
 from utils import setup_dirs, setup_device, save_embeddings, load_embeddings, Visualize
 from losses import cosine_pairwise_loss, deepcca
 
+def parse_args(): 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--wandb_track', default=0, type=int)
+    parser.add_argument('--experiment_name', default='RandomExperiment', type=str)
+    parser.add_argument('--epochs', default=20, type=int)
+    parser.add_argument('--task', default='uw', type=str)
+
+    return parser.parse_known_args()
+
+# Add learning rate scheduling. 
+def lr_lambda(e):
+    if e < 50:
+        return 0.001
+    elif e < 100:
+        return 0.0001
+    else:
+        return 0.00001
 
 def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', margin=0.4, losstype='deepcca'):
     """Train joint embedding networks."""
@@ -24,9 +41,9 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
     
     # Setup the results and device.
     results_dir = setup_dirs(experiment_name)
-    if not os.path.exists(results_dir+'train_results/'):
-        os.makedirs(results_dir+'train_results/')
-    train_results_dir=results_dir+'train_results/'
+    train_results_dir = os.path.join(results_dir, 'train_results/')
+    if not os.path.exists(train_results_dir):
+        os.makedirs(os.path.join(train_results_dir)
     device = setup_device(gpu_num)    
 
     #### Hyperparameters #####    
@@ -37,17 +54,12 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
         config = wandb.config
         config.epochs = epochs
 
-    with open(results_dir+'hyperparams_train.txt','w') as f:
-        f.write('Command used to run: python ')
-        f.write(' '.join(sys.argv))
-        f.write('\n')
-        f.write('device in use: '+str(device))
-        f.write('\n')
-        f.write('--experiment_name '+str(experiment_name))
-        f.write('\n')
-        f.write('--epochs '+str(epochs))
-        f.write('\n')
-        
+    with open(os.path.join(results_dir, 'hyperparams_train.txt'), 'w') as f:
+        f.write('Command used to run: python \n')
+        f.write(f'ARGS: {ARGS}\n')
+        f.write(f'device in use: {device}\n')
+        f.write(f'--experiment_name {experiment_name}')
+        f.write(f'--epochs {epochs}\n')
     
     # Setup data loaders and models.
     if task == 'cifar10':
@@ -61,16 +73,22 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
     elif task == 'uw':
         uw_data = 'bert'
         train_loader, test_loader = uw_loaders(uw_data)
-        if uw_data == 'bert':            
-            model_A = RowNet(3072, embed_dim=1024) # Language. 
-            model_B = RowNet(4096, embed_dim=1024) # Vision.        
-    
-    
-    # Finish model setup.
-    if pretrained == 'pretrained':  # If we want to load pretrained models to continue training.        
+        if uw_data == 'bert':
+            # Language
+            model_A = RowNet(3072, embed_dim=1024)
+            # Vision 
+            model_B = RowNet(4096, embed_dim=1024)
+    elif task == 'gld':
+        train_loader, test_loader = gld_loaders('/home/iral/data_processing/gld_data_complete.pkl')
+        model_A = RowNet(3072, embed_dim=1024)
+        model_B = RowNet(4096, embed_dim=1024)
+         
+    # Finish model setup
+    # If we want to load pretrained models to continue training...
+    if pretrained == 'pretrained':        
         print('Starting from pretrained networks.')
-        model_A.load_state_dict(torch.load(train_results_dir+'model_A_state.pt'))
-        model_B.load_state_dict(torch.load(train_results_dir+'model_B_state.pt'))
+        model_A.load_state_dict(torch.load(os.path.join(train_results_dir, 'model_A_state.pt')))
+        model_B.load_state_dict(torch.load(os.path.join(train_results_dir, 'model_B_state.pt')))
      
     print('Starting from scratch to train networks.')
 
@@ -78,18 +96,9 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
     model_B.to(device)
 
     # Initialize the optimizers and loss function.
-    optimizer_A = torch.optim.Adam(model_A.parameters(), lr=0.00001)  
-    optimizer_B = torch.optim.Adam(model_B.parameters(), lr=0.00001)  
+    optimizer_A = torch.optim.Adam(model_A.parameters(), lr=0.00001)
+    optimizer_B = torch.optim.Adam(model_B.parameters(), lr=0.00001) 
     
-    
-    # Add learning rate scheduling. 
-    def lr_lambda(e):
-        if e < 50:
-            return 0.001
-        elif e < 100:
-            return 0.0001
-        else:
-            return 0.00001
     scheduler_A = torch.optim.lr_scheduler.LambdaLR(optimizer_A, lr_lambda)
     scheduler_B = torch.optim.lr_scheduler.LambdaLR(optimizer_B, lr_lambda)
 
@@ -102,14 +111,15 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
     
     # Train.
     # wandb
-    if wandb_track==1:        
+    if wandb_track == 1:
         wandb.watch(model_A, log="all")
-        wandb.watch(model_B, log="all")    
-    epoch_list = [] # in order to save epoch in a pickle file
-    loss_list = [] # in order to save loss in a pickle file
+        wandb.watch(model_B, log="all")
+    # for saving to files
+    epoch_list = []
+    loss_list = []
     for epoch in tqdm(range(epochs)):
         epoch_loss = 0.0
-        counter=0
+        counter = 0
         for data in train_loader:
             data_a = data[0].to(device)
             data_b = data[1].to(device)
@@ -122,9 +132,9 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
             # Forward.                             
             if losstype == 'deepcca': # Based on Galen Andrew's Deep CCA
                 # data_a is from domain A, and data_b is the paired data from domain B.                
-                embedding_a=model_A(data_a)
-                embedding_b=model_B(data_b)
-                loss= deepcca(embedding_a, embedding_b, device, use_all_singular_values=True, outdim_size=128)
+                embedding_a = model_A(data_a)
+                embedding_b = model_B(data_b)
+                loss = deepcca(embedding_a, embedding_b, device, use_all_singular_values=True, outdim_size=128)
                                                                
             # Backward.                    
             loss.backward()
@@ -134,43 +144,69 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
             optimizer_B.step()
 
             # Save batch loss. Since we are minimizing -corr the loss is negative.
-            loss_hist.append(-1*loss.item())
+            loss_hist.append(-1 * loss.item())
             
             epoch_loss += embedding_a.shape[0] * loss.item()
 
             #reporting progress
             counter+=1
-            if counter%64==0:
+            if not counter % 64:
                 print('epoch:',epoch, 'loss:', loss.item())
-                if wandb_track==1:
+                if wandb_track == 1:
                     wandb.log({"epoch": epoch,"loss": loss})
 
         # Save network state at each epoch.
-        torch.save(model_A.state_dict(), train_results_dir+'model_A_state.pt')
-        torch.save(model_B.state_dict(), train_results_dir+'model_B_state.pt')
+        torch.save(model_A.state_dict(), os.path.join(train_results_dir, 'model_A_state.pt'))
+        torch.save(model_B.state_dict(), os.path.join(train_results_dir, 'model_B_state.pt'))
         
         #since the batch size is 1 therefore: len(trainloader)==counter
         print('*********** epoch is finished ***********')
-        epoch_loss=-1*epoch_loss
-        print('epoch: ', epoch, 'loss(correlation): ', (epoch_loss) / counter)
-        epoch_list.append(epoch+1)
+        epoch_loss = -1 * epoch_loss
+        print(f'epoch: {epoch}, loss(correlation): {epoch_loss / counter}')
+        epoch_list.append(epoch + 1)
         loss_list.append(epoch_loss / counter)
-        pickle.dump( ([epoch_list, loss_list]), open( train_results_dir+'epoch_loss.pkl', "wb" ) )
-        Visualize(train_results_dir+'epoch_loss.pkl','Correlation History',True,'epoch','Correlation (log scale)',None,'log',None,(14,7),train_results_dir+'Figures/')
+
+        Visualize(
+            os.path.join(train_results_dir, 'epoch_loss.pkl'),
+            'Correlation History',
+            True,
+            'epoch',
+            'Correlation (log scale)',
+            None,
+            'log',
+            None,
+            (14, 7),
+            os.path.join(train_results_dir, 'Figures/')
+        )
         # Update learning rate schedulers.
         scheduler_A.step()
         scheduler_B.step()
-        
+
+    with open(os.path.join(train_results_dir, 'epoch_loss.pkl'), 'wb') as fout:
+        pickle.dump(([epoch_list, loss_list]), fout)
 
     # Plot and save batch loss history.
-    pickle.dump( ([loss_hist[::10]]), open( train_results_dir+'epoch_corr.pkl', "wb" ) )
-    Visualize(train_results_dir+'epoch_corr.pkl','Correlation Batch',False, 'Batch','Correlation (log scale)',None,'log',None,(14,7),train_results_dir+'Figures/')    
+    with open(os.path.join(train_results_dir, 'epoch_corr.pkl'), 'wb') as fout:
+        pickle.dump( ([loss_hist[::10]]), fout)
+
+    Visualize(
+        os.path.join(train_results_dir, 'epoch_corr.pkl'),
+        'Correlation Batch',
+        False,
+        'Batch',
+        'Correlation (log scale)',
+        None,
+        'log',
+        None,
+        (14, 7),
+        os.path.join(train_results_dir, 'Figures/')
+    )    
 
     #### Learn the transformations for CCA ####
-    if losstype=="CCA":        
+    if losstype == "CCA":
         a_base = []
         b_base = []
-        no_model=True
+        no_model = True
 
         if no_model: # without using model: using raw data without featurization
             for data in train_loader:    
@@ -200,10 +236,8 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
                 b_base.append(model_B(y).cpu().detach().numpy())
         
         # Concatenate predictions.
-        a_base = np.concatenate(a_base,axis=0)
-        b_base = np.concatenate(b_base,axis=0)
-        a_base=np.squeeze(a_base)
-        b_base=np.squeeze(b_base)
+        a_base = np.squeeze(np.concatenate(a_base, axis=0))
+        b_base = np.squeeze(np.concatenate(b_base, axis=0))
 
         if no_model:
             new_a_base=[]
@@ -222,18 +256,17 @@ def train(wandb_track, experiment_name, epochs, task, gpu_num=0, pretrained='', 
         from joblib import dump
         components=128
         cca = CCA(n_components=components)
-        cca.max_iter=5000
+        cca.max_iter = 5000
         cca.fit(a_base, b_base)
         dump(cca, 'Learned_CCA.joblib') 
     #### End of CCA fit to find the transformations ####
 
     print('Training Done!')
 
-if __name__ == '__main__':    
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--wandb_track', default=0, type=int)
-    parser.add_argument('--experiment_name', default='RandomExperiment', type=str)
-    parser.add_argument('--epochs', default=20, type=int)
-    parser.add_argument('--task', default='uw', type=str)
-    args = parser.parse_args()
-    train(args.wandb_track,args.experiment_name,args.epochs,args.task)
+def main():
+    ARGS, unused = parse_args()
+
+    train(ARGS.wandb_track, ARGS.experiment_name, ARGS.epochs, args.ARGS)
+
+if __name__ == '__main__':
+    main() 
