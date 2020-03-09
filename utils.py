@@ -15,39 +15,38 @@ def setup_dirs(experiment_name):
     
 def setup_device(gpu_num=0):
     """Setup device."""
-    device_name = 'cuda:'+str(gpu_num) if torch.cuda.is_available() else 'cpu'  # Is there a GPU? 
+    # IS there a GPU?
+    device_name = f'cuda: {gpu_num}' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device_name)
+
     return device
 
 def load_embeddings(embedding_path):
-    embedding = None
-    if os.path.exists(embedding_path):
-        embedding = np.load(embedding_path)            
-    return embedding
+    return np.load(embedding_path) if os.path.exists(embedding_path) else None
 
 def save_embeddings(embedding_path,embedding):
     if not os.path.exists(embedding_path):
         np.save(embedding_path, embedding)
 
-def Visualize(pkldata,title,has_x_axis,xlablel,ylabel,xscale,yscale,legend,figsize,location):
-    if not os.path.exists(location):        
+def Visualize(pkldata, title, has_x_axis, xlablel, ylabel, xscale, yscale, legend, figsize, location):
+    if not os.path.exists(location):
         os.makedirs(location)
-    visual=pickle.load(open(pkldata, 'rb'))
+    visual = pickle.load(open(pkldata, 'rb'))
     #Note: I always save the x label in visual[0], and the results from different methods in next indices visual[1], visual[2], ...
     if figsize is not None:
         plt.figure(figsize=figsize)
     if legend is not None:
         if has_x_axis:
             for i in range(len(visual)-1):         
-                plt.plot(visual[0],visual[i+1],label=legend[i]) 
+                plt.plot(visual[0], visual[i + 1], label=legend[i]) 
         else:
-            for i in range(len(visual)):         
-                plt.plot(visual[i],label=legend[i]) 
+            for i in range(len(visual)):
+                plt.plot(visual[i], label=legend[i]) 
 
     else:
         if has_x_axis:            
-            for i in range(len(visual)-1):         
-                plt.plot(visual[0],visual[i+1]) 
+            for i in range(len(visual) - 1):         
+                plt.plot(visual[0],visual[i + 1]) 
         else:            
             for i in range(len(visual)):         
                 plt.plot(visual[i]) 
@@ -60,39 +59,33 @@ def Visualize(pkldata,title,has_x_axis,xlablel,ylabel,xscale,yscale,legend,figsi
         plt.yscale(yscale)
     if legend is not None:
         plt.legend(loc='lower right')
-    plt.savefig(location+title+'.pdf')
+    plt.savefig(f'{location}{title}.pdf')
     plt.close('all')
 
 def procrustes_distance(A, B):
-        
     # Translation.
-    mean_A = torch.mean(A,0)
-    mean_B = torch.mean(B,0)
-    A = A - mean_A
-    B = B - mean_B
+    A -= torch.mean(A, 0)
+    B -= torch.mean(B, 0)
         
     # Scaling.
-    s_A = torch.norm(A)
-    s_B = torch.norm(B)
-    A = torch.div(A, s_A)
-    B = torch.div(B, s_B)
+    A = torch.div(A, torch.norm(A))
+    B = torch.div(B, torch.norm(B))
         
     # Orthogonal Procrustes.
     M = torch.t(torch.mm(torch.t(B),A))
     u, s, v = torch.svd(M)
-    R = torch.mm(u,torch.t(v))
+    R = torch.mm(u, torch.t(v))
     s = torch.sum(s)
-    B = torch.mm(B,torch.t(R)) * s
+    B = s * torch.mm(B,torch.t(R))
         
     # Compute distance.
-    dists = torch.norm(A-B, dim=1)
+    dists = torch.norm(A - B, dim=1)
         
     return dists
     
 
 class Procrustes():
     """Transformation: translate, scale, and rotate/reflect."""
-    
     def __init__(self, A, B, trans=True, scale=True, rot=True):
         self.trans = trans
         self.scale = scale
@@ -128,4 +121,5 @@ class Procrustes():
             B = np.divide(B, self.s_B)
         if self.rot:
             B = B.dot(self.R.T) * self.s
+
         return A, B
