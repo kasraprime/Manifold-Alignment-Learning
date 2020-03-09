@@ -65,29 +65,29 @@ def Visualize(pkldata,title,has_x_axis,xlablel,ylabel,xscale,yscale,legend,figsi
 
 def procrustes_distance(A, B):
         
-        # Translation.
-        mean_A = torch.mean(A,0)
-        mean_B = torch.mean(B,0)
-        A = A - mean_A
-        B = B - mean_B
+    # Translation.
+    mean_A = torch.mean(A,0)
+    mean_B = torch.mean(B,0)
+    A = A - mean_A
+    B = B - mean_B
         
-        # Scaling.
-        s_A = torch.norm(A)
-        s_B = torch.norm(B)
-        A = torch.div(A, s_A)
-        B = torch.div(B, s_B)
+    # Scaling.
+    s_A = torch.norm(A)
+    s_B = torch.norm(B)
+    A = torch.div(A, s_A)
+    B = torch.div(B, s_B)
         
-        # Orthogonal Procrustes.
-        M = torch.t(torch.mm(torch.t(B),A))
-        u, s, v = torch.svd(M)
-        R = torch.mm(u,torch.t(v))
-        s = torch.sum(s)
-        B = torch.mm(B,torch.t(R)) * s
+    # Orthogonal Procrustes.
+    M = torch.t(torch.mm(torch.t(B),A))
+    u, s, v = torch.svd(M)
+    R = torch.mm(u,torch.t(v))
+    s = torch.sum(s)
+    B = torch.mm(B,torch.t(R)) * s
         
-        # Compute distance.
-        dists = torch.norm(A-B, dim=1)
+    # Compute distance.
+    dists = torch.norm(A-B, dim=1)
         
-        return dists
+    return dists
     
 
 class Procrustes():
