@@ -1,3 +1,5 @@
+## Code by Andre Nguyen: github.com/andrenguyen
+
 import os
 import sys
 import numpy as np
