@@ -1,3 +1,5 @@
+## Code by Andre Nguyen: github.com/andrenguyen
+
 import copy
 import numpy as np
 import scipy as sp
